@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dynamos Racing Team | Test di Reazione ad Alta Precisione</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Inter & JetBrains Mono per la telemetria -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .font-mono-telemetry {
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Sfondo stile telemetria motorsport / fibra di carbonio sottile */
+        .bg-telemetry {
+            background-color: #090d16;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.45) 0%, transparent 70%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px, 32px 32px;
+        }
+
+        /* Contenitore Semaforo F1 */
+        .f1-gantry {
+            background: linear-gradient(180deg, #181c24 0%, #0d1015 100%);
+        /* Lampade Semaforo: NESSUNA transizione CSS, colori solidi GPU per cambio istantaneo in 0ms */
+        .light-bulb {
+            transition: none !important;
+            will-change: background-color, border-color;
+            background-color: #1a1d24;
+            border-color: #262b36;
+        }
+
+        /* Luce Rossa Accesa */
+        .light-bulb.red-on {
+            background-color: #ff1e1e;
+            border-color: #ff8a8a;
+        }
+
+        /* Luce Verde di Via al Lights Out */
+        .light-bulb.green-on {
+            background-color: #10e862;
+            border-color: #9effc3;
+        }
+
+        /* Luce Gialla/Ambra per Falso Start */
+        .light-bulb.amber-on {
+            background-color: #f59e0b;
+            border-color: #fde047;
+        }
+
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.96) translateY(6px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-pop {
+            animation: pop-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="bg-telemetry text-slate-100 min-h-screen flex flex-col justify-between antialiased">
+
+    <!-- Header Telemetria -->
+    <header class="w-full bg-slate-950/90 backdrop-blur-md border-b border-slate-800/90 px-4 py-3 sm:px-8 flex items-center justify-between z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white flex items-center justify-center shadow-lg shadow-red-600/20 border border-red-400/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-black text-white text-base sm:text-lg tracking-tight uppercase">Dynamos Racing Team</h1>
+                    <span class="hidden sm:inline-block text-[10px] font-mono-telemetry font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">0.00ms RAF LOOP</span>
+                </div>
+                <p class="text-xs text-slate-400 hidden sm:block">Zero-latency input &amp; clock unico <code class="text-slate-300">performance.now()</code></p>
+            </div>
+        </div>
+
+        <!-- Controlli Header: Hz Monitor, Sync VSync, Audio, Record, Modalità -->
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Diagnostica Hz Monitor Live -->
+            <div class="hidden md:flex flex-col text-right px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800" title="Frequenza di aggiornamento rilevata dal browser">
+                <span class="block text-[9px] uppercase tracking-wider font-bold text-slate-500">Monitor Sync</span>
+                <span id="header-hz-badge" class="font-mono-telemetry font-bold text-xs text-sky-400">-- Hz / -- ms</span>
+            </div>
+
+            <!-- Record Personale -->
+            <div class="text-right hidden xs:block">
+                <span class="block text-[10px] uppercase tracking-wider font-bold text-slate-500">Record</span>
+                <span id="header-best-score" class="font-mono-telemetry font-extrabold text-sm sm:text-base text-emerald-400">-- ms</span>
+            </div>
+
+            <div class="h-7 w-px bg-slate-800 hidden xs:block"></div>
+
+            <!-- Toggle Modalità VSync Reale vs DOM Immediato -->
+            <button id="btn-sync-toggle" type="button" title="Cambia punto di partenza del cronometro: VSync Reale (paint effettivo a schermo) oppure DOM Immediato"
+                    class="text-[11px] sm:text-xs font-bold px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-300 transition-colors cursor-pointer">
+                Sync: <span id="sync-mode-label" class="text-sky-400">VSync</span>
+            </button>
+
+            <!-- Pulsante Audio Beep Semaforo -->
+            <button id="btn-audio-toggle" type="button" aria-label="Attiva o disattiva audio semaforo"
+                    class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-300 transition-colors cursor-pointer" title="Audio Semaforo">
+                <!-- Icona Audio Attivo -->
+                <svg id="icon-audio-on" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                </svg>
+                <!-- Icona Audio Muto -->
+                <svg id="icon-audio-off" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <line x1="23" y1="9" x2="17" y2="15"></line>
+                    <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>
+            </button>
+
+            <!-- Toggle Modalità -->
+            <button id="btn-mode-toggle" type="button" class="text-xs sm:text-sm font-bold px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-200 transition-colors cursor-pointer">
+                Serie: <span id="mode-label" class="text-red-400">5 Giri</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Arena Principale Interattiva -->
+    <main class="flex-1 flex flex-col w-full">
+        <div id="arena" role="button" tabindex="0" aria-label="Area del test di reazione F1"
+             class="w-full flex-1 min-h-[490px] sm:min-h-[560px] flex flex-col items-center justify-center px-4 py-6 sm:py-8 cursor-pointer relative overflow-hidden focus:outline-none">
+            
+            <!-- Barra Stato Superiore nell'Arena -->
+            <div class="w-full max-w-2xl flex items-center justify-between gap-2 mb-4 px-2 pointer-events-none">
+                <div id="round-badge" class="bg-slate-900/90 border border-slate-700/80 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase text-slate-300">
+                    Round 1 / 5
+                </div>
+                <div id="mobile-hz-badge" class="md:hidden font-mono-telemetry bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full text-[11px] text-sky-400 font-bold">
+                    -- Hz
+                </div>
+                <div id="sequence-timer-badge" class="font-mono-telemetry bg-slate-900/90 border border-slate-800 px-3.5 py-1.5 rounded-full text-xs text-slate-400">
+                    Timer: <span id="sequence-elapsed" class="text-slate-200 font-bold">0.00 ms</span>
+                </div>
+            </div>
+
+            <!-- Pillole Avanzamento 5 Round -->
+            <div id="rounds-stepper" class="w-full max-w-2xl grid grid-cols-5 gap-2 mb-6 px-2 pointer-events-none">
+                <!-- Generato dinamicamente via JS -->
+            </div>
+
+            <!-- SEMAFORO FORMULA 1 A 5 COLONNE -->
+            <div id="f1-gantry-wrapper" class="w-full max-w-xl mb-7 pointer-events-none">
+                <!-- Traversa superiore di supporto -->
+                <div class="h-3 w-4/5 mx-auto bg-slate-800 rounded-t-lg border-t border-x border-slate-700"></div>
+                
+                <!-- Corpo principale del semaforo -->
+                <div class="f1-gantry rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-slate-700/90">
+                    <div class="grid grid-cols-5 gap-2.5 sm:gap-5">
+                        <!-- Colonna 1 -->
+                        <div class="bg-slate-950/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-slate-800 flex flex-col items-center gap-2.5 sm:gap-3.5 shadow-inner">
+                            <div data-col="0" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                            <div data-col="0" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                        </div>
+                        <!-- Colonna 2 -->
+                        <div class="bg-slate-950/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-slate-800 flex flex-col items-center gap-2.5 sm:gap-3.5 shadow-inner">
+                            <div data-col="1" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                            <div data-col="1" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                        </div>
+                        <!-- Colonna 3 -->
+                        <div class="bg-slate-950/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-slate-800 flex flex-col items-center gap-2.5 sm:gap-3.5 shadow-inner">
+                            <div data-col="2" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                            <div data-col="2" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                        </div>
+                        <!-- Colonna 4 -->
+                        <div class="bg-slate-950/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-slate-800 flex flex-col items-center gap-2.5 sm:gap-3.5 shadow-inner">
+                            <div data-col="3" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                            <div data-col="3" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                        </div>
+                        <!-- Colonna 5 -->
+                        <div class="bg-slate-950/90 rounded-xl sm:rounded-2xl p-2 sm:p-3 border border-slate-800 flex flex-col items-center gap-2.5 sm:gap-3.5 shadow-inner">
+                            <div data-col="4" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                            <div data-col="4" class="light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2 border-slate-800"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messaggi Dinamici / Risultato Singolo -->
+            <div id="arena-content" class="max-w-xl w-full text-center flex flex-col items-center justify-center min-h-[150px] pointer-events-none">
+                <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2.5 uppercase">
+                    Clicca o premi SPAZIO per iniziare
+                </h2>
+                <p class="text-sm sm:text-base text-slate-400 max-w-md leading-relaxed">
+                    Si accenderanno <span class="text-red-400 font-bold">5 semafori rossi</span> in sequenza. Appena si spengono, premi <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs font-mono-telemetry text-slate-200">SPAZIO</kbd> / <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs font-mono-telemetry text-slate-200">INVIO</kbd> o tocca lo schermo.
+                </p>
+            </div>
+
+            <!-- Pannello Riepilogo Finale Serie da 5 Round -->
+            <div id="summary-panel" class="hidden max-w-3xl w-full bg-slate-900/95 border border-slate-700/90 text-slate-100 rounded-3xl p-5 sm:p-8 shadow-2xl animate-pop cursor-default">
+                <div class="text-center mb-6">
+                    <span class="inline-block px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-extrabold uppercase tracking-wider mb-2">Telemetria Sessione Completata (5 Round)</span>
+                    <h2 class="text-2xl sm:text-3xl font-black text-white">Analisi Finale dei Tempi</h2>
+                </div>
+
+                <!-- Card Riepilogative Principali: Media Sessione & Miglior Risultato + Consistenza -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-6">
+                    <div class="bg-slate-950/90 border border-sky-500/30 rounded-2xl p-4 text-center relative overflow-hidden">
+                        <span class="block text-[11px] font-bold uppercase tracking-wider text-sky-400 mb-1">Media Sessione</span>
+                        <div class="font-mono-telemetry text-2xl sm:text-3xl font-black text-white"><span id="summary-avg">0.00</span><span class="text-xs font-semibold text-slate-400 ml-1">ms</span></div>
+                    </div>
+                    <div class="bg-slate-950/90 border border-emerald-500/40 rounded-2xl p-4 text-center relative overflow-hidden">
+                        <span class="block text-[11px] font-bold uppercase tracking-wider text-emerald-400 mb-1">🏆 Miglior Risultato</span>
+                        <div class="font-mono-telemetry text-2xl sm:text-3xl font-black text-emerald-400"><span id="summary-best">0.00</span><span class="text-xs font-semibold text-emerald-500/80 ml-1">ms</span></div>
+                    </div>
+                    <div class="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 text-center">
+                        <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Consistenza (σ)</span>
+                        <div class="font-mono-telemetry text-2xl sm:text-3xl font-black text-slate-200">±<span id="summary-stddev">0.00</span><span class="text-xs font-semibold text-slate-500 ml-1">ms</span></div>
+                    </div>
+                </div>
+
+                <!-- Grafico Interattivo SVG dei 5 Tempi -->
+                <div class="mb-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Grafico Andamento 5 Round</span>
+                        <div class="flex items-center gap-3 text-[11px] text-slate-400">
+                            <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Miglior Round</span>
+                            <span class="inline-flex items-center gap-1"><span class="w-3 border-t-2 border-dashed border-sky-400"></span> Media</span>
+                        </div>
+                    </div>
+                    <div id="results-chart-container" class="w-full relative">
+                        <!-- SVG renderizzato dinamicamente via JS -->
+                    </div>
+                </div>
+
+                <!-- Tabella Dettagliata dei 5 Round -->
+                <div class="mb-6 bg-slate-950/90 border border-slate-800 rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-800 bg-slate-900/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    <th class="py-3 px-4">Round</th>
+                                    <th class="py-3 px-4">Tempo</th>
+                                    <th class="py-3 px-4">Diff. Media</th>
+                                    <th class="py-3 px-4 text-right">Valutazione / Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-table-body" class="divide-y divide-slate-800/70 text-xs sm:text-sm">
+                                <!-- Righe generate via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Barra Visiva di Confronto F1 vs Media Umana -->
+                <div class="mb-6 bg-slate-950/90 border border-slate-800 rounded-2xl p-4">
+                    <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Livello Riflessi</span>
+                        <span id="summary-rank-badge" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Pilota F1</span>
+                    </div>
+                    
+                    <div class="relative h-3.5 w-full rounded-full overflow-hidden flex bg-slate-800 my-2.5">
+                        <div class="h-full bg-purple-500 w-1/4" title="Riflessi Pilota F1 (<190ms)"></div>
+                        <div class="h-full bg-emerald-500 w-1/4" title="Molto Veloce (190-225ms)"></div>
+                        <div class="h-full bg-sky-500 w-1/4" title="Media Umana (225-270ms)"></div>
+                        <div class="h-full bg-amber-500 w-1/4" title="Rilassato (>270ms)"></div>
+                        <div id="scale-marker" class="absolute top-0 bottom-0 w-1.5 bg-white ring-2 ring-slate-950 shadow-lg transition-all duration-500" style="left: 50%;"></div>
+                    </div>
+
+                    <div class="grid grid-cols-4 text-[10px] sm:text-xs text-center font-semibold text-slate-400 gap-1">
+                        <div><span class="block font-mono-telemetry text-purple-400 font-bold">&lt; 190 ms</span>Pilota F1</div>
+                        <div><span class="block font-mono-telemetry text-emerald-400 font-bold">190–225 ms</span>Molto Veloce</div>
+                        <div><span class="block font-mono-telemetry text-sky-400 font-bold">225–270 ms</span>Media Umana</div>
+                        <div><span class="block font-mono-telemetry text-amber-400 font-bold">&gt; 270 ms</span>Rilassato</div>
+                    </div>
+                    <p id="summary-record-note" class="text-center text-xs text-slate-400 mt-3 pt-2.5 border-t border-slate-800/80"></p>
+                </div>
+
+                <!-- Pulsanti Azione -->
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button id="btn-restart" type="button" class="flex-1 bg-red-600 hover:bg-red-500 active:scale-[0.99] text-white font-extrabold py-3.5 px-6 rounded-xl shadow-lg shadow-red-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                        Nuova Sessione (5 Round)
+                    </button>
+                    <button id="btn-continue-endless" type="button" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold py-3.5 px-5 rounded-xl transition-colors cursor-pointer">
+                        Modalità Infinita
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Sezione Inferiore: Telemetria Sessione e Storico Record -->
+    <section class="w-full max-w-4xl mx-auto px-4 py-6 sm:px-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Card Tentativi Sessione Corrente -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        Partenze Sessione Corrente
+                    </h3>
+                    <button id="btn-reset-session" type="button" class="text-xs font-semibold text-slate-500 hover:text-rose-400 transition-colors cursor-pointer">
+                        Azzera serie
+                    </button>
+                </div>
+                
+                <div id="session-attempts-list" class="flex flex-wrap gap-2 min-h-[38px] items-center">
+                    <span class="text-xs text-slate-500 italic">Nessuna partenza registrata in questa serie.</span>
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-slate-800/80 flex justify-between text-xs text-slate-400">
+                    <span>Media parziale: <strong id="live-avg" class="font-mono-telemetry text-slate-200">-- ms</strong></span>
+                    <span>Miglior stacco: <strong id="live-best" class="font-mono-telemetry text-emerald-400">-- ms</strong></span>
+                </div>
+            </div>
+
+            <!-- Card Storico Medie & Record Personali -->
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Record Personali &amp; Medie
+                    </h3>
+                    <button id="btn-clear-storage" type="button" class="text-xs font-semibold text-slate-500 hover:text-rose-400 transition-colors cursor-pointer">
+                        Cancella dati
+                    </button>
+                </div>
+
+                <div id="history-averages-list" class="flex flex-wrap gap-2 min-h-[38px] items-center">
+                    <span class="text-xs text-slate-500 italic">Completa una serie da 5 per salvare la media.</span>
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-slate-800/80 flex justify-between text-xs text-slate-400">
+                    <span>Record singolo: <strong id="storage-best-single" class="font-mono-telemetry text-emerald-400">-- ms</strong></span>
+                    <span>Miglior media: <strong id="storage-best-avg" class="font-mono-telemetry text-sky-400">-- ms</strong></span>
+                </div>
+            </div>
+
+        </div>
+        <p class="text-center text-[11px] text-slate-500 mt-4">
+            Motore Zero-Latency: loop continuo <code class="text-slate-400">requestAnimationFrame</code> con precisione <code class="text-slate-400">0.00 ms</code> e soglia minima umana di <code class="text-slate-400">100.00 ms</code>.
+        </p>
+    </section>
+
+    <script>
+        /**
+         * F1 Lights Out - Motore Telemetrico Zero-Latency (0.00 ms)
+         * 1. Precisione al centesimo di millisecondo (toFixed(2)) su cronometro live, round e statistiche.
+         * 2. Soglia minima umana di 100.00 ms: qualsiasi input prima dello spegnimento o < 100.00 ms attiva "Sei andato d'anticipo!".
+         * 3. Sessione strutturata in 5 Round con indicatori live, tabella dettagliata e grafico SVG interattivo.
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Riferimenti DOM ---
+            const arena = document.getElementById('arena');
+            const arenaContent = document.getElementById('arena-content');
+            const gantryWrapper = document.getElementById('f1-gantry-wrapper');
+            const roundBadge = document.getElementById('round-badge');
+            const roundsStepper = document.getElementById('rounds-stepper');
+            const sequenceElapsedEl = document.getElementById('sequence-elapsed');
+            const summaryPanel = document.getElementById('summary-panel');
+            const headerHzBadge = document.getElementById('header-hz-badge');
+            const mobileHzBadge = document.getElementById('mobile-hz-badge');
+
+            // Lampade dei 5 semafori (raggruppate per colonna 0..4)
+            const columns = [0, 1, 2, 3, 4].map(idx =>
+                Array.from(document.querySelectorAll(`.light-bulb[data-col="${idx}"]`))
+            );
+
+            // Controlli Header
+            const headerBestScore = document.getElementById('header-best-score');
+            const btnSyncToggle = document.getElementById('btn-sync-toggle');
+            const syncModeLabel = document.getElementById('sync-mode-label');
+            const btnAudioToggle = document.getElementById('btn-audio-toggle');
+            const iconAudioOn = document.getElementById('icon-audio-on');
+            const iconAudioOff = document.getElementById('icon-audio-off');
+            const btnModeToggle = document.getElementById('btn-mode-toggle');
+            const modeLabel = document.getElementById('mode-label');
+
+            // Elementi Riepilogo Finale
+            const summaryAvg = document.getElementById('summary-avg');
+            const summaryBest = document.getElementById('summary-best');
+            const summaryStdDev = document.getElementById('summary-stddev');
+            const resultsChartContainer = document.getElementById('results-chart-container');
+            const resultsTableBody = document.getElementById('results-table-body');
+            const summaryRankBadge = document.getElementById('summary-rank-badge');
+            const summaryRecordNote = document.getElementById('summary-record-note');
+            const scaleMarker = document.getElementById('scale-marker');
+            const btnRestart = document.getElementById('btn-restart');
+            const btnContinueEndless = document.getElementById('btn-continue-endless');
+
+            // Elementi Statistiche Inferiori
+            const sessionAttemptsList = document.getElementById('session-attempts-list');
+            const liveAvgEl = document.getElementById('live-avg');
+            const liveBestEl = document.getElementById('live-best');
+            const historyAveragesList = document.getElementById('history-averages-list');
+            const storageBestSingleEl = document.getElementById('storage-best-single');
+            const storageBestAvgEl = document.getElementById('storage-best-avg');
+            const btnResetSession = document.getElementById('btn-reset-session');
+            const btnClearStorage = document.getElementById('btn-clear-storage');
+
+            // --- Sintetizzatore Audio Web Audio API ---
+            let audioEnabled = true;
+            let audioCtx = null;
+
+            function warmUpAudio() {
+                if (!audioEnabled) return null;
+                if (!audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+                    }
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                return audioCtx;
+            }
+
+            function scheduleHardwareTone(freq, durationSec, type = 'triangle', volume = 0.14) {
+                const ctx = warmUpAudio();
+                if (!ctx) return;
+
+                const t0 = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, t0);
+
+                gain.gain.setValueAtTime(0.0001, t0);
+                gain.gain.linearRampToValueAtTime(volume, t0 + 0.004);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(t0);
+                osc.stop(t0 + durationSec + 0.01);
+            }
+
+            // --- Misurazione Frequenza Monitor (Hz / ms per frame) ---
+            let lastRafTimestamp = 0;
+            let frameDeltaHistory = [];
+            let measuredHz = 60;
+            let measuredFrameMs = 16.67;
+            let lastHzUiUpdate = 0;
+
+            function updateDisplayRefreshStats(now) {
+                if (lastRafTimestamp > 0) {
+                    const delta = now - lastRafTimestamp;
+                    if (delta >= 1.5 && delta <= 50) {
+                        frameDeltaHistory.push(delta);
+                        if (frameDeltaHistory.length > 45) {
+                            frameDeltaHistory.shift();
+                        }
+                        if (now - lastHzUiUpdate > 350 && frameDeltaHistory.length >= 10) {
+                            const avgDelta = frameDeltaHistory.reduce((a, b) => a + b, 0) / frameDeltaHistory.length;
+                            measuredFrameMs = avgDelta;
+                            measuredHz = Math.round(1000 / avgDelta);
+                            headerHzBadge.textContent = `${measuredHz} Hz / ${measuredFrameMs.toFixed(2)} ms`;
+                            mobileHzBadge.textContent = `${measuredHz} Hz`;
+                            lastHzUiUpdate = now;
+                        }
+                    }
+                }
+                lastRafTimestamp = now;
+            }
+
+            // --- Stati e Variabili della Macchina a Stati ---
+            const STATES = {
+                IDLE: 'IDLE',
+                SEQUENCE: 'SEQUENCE',     // Accensione progressiva 1->5 + attesa casuale
+                LIGHTS_OUT: 'LIGHTS_OUT', // Semafori spenti: cronometro attivo
+                FALSE_START: 'FALSE_START',
+                RESULT: 'RESULT',
+                SUMMARY: 'SUMMARY'
+            };
+
+            const MIN_VALID_REACTION_MS = 100.00; // Soglia minima sotto la quale è considerato anticipo
+            let currentState = STATES.IDLE;
+            let useRealVSync = true;
+
+            // Timestamp ad alta precisione basati esclusivamente su performance.now()
+            let sequenceStartTime = 0;
+            let lightsOutTargetTime = 0;
+            let lightsOutExactTime = 0;
+            let litColumnsCount = 0;
+            let lastClockUiRender = 0;
+
+            const STEP_INTERVAL_MS = 750;
+            let isEndlessMode = false;
+            const STANDARD_ROUNDS = 5;
+            let sessionTimes = [];
+
+            // Chiavi localStorage
+            const STORAGE_KEY_BEST_SINGLE = 'f1_reaction_best_single_v4';
+            const STORAGE_KEY_BEST_AVG = 'f1_reaction_best_avg_v4';
+            const STORAGE_KEY_HISTORY = 'f1_reaction_avg_history_v4';
+
+            // --- Controllo GPU Diretto delle Lampade ---
+            function resetAllLights() {
+                for (let c = 0; c < 5; c++) {
+                    columns[c][0].className = 'light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2';
+                    columns[c][1].className = 'light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2';
+                }
+            }
+
+            function lightColumnRed(colIndex) {
+                columns[colIndex][0].classList.add('red-on');
+                columns[colIndex][1].classList.add('red-on');
+            }
+
+            function setAllLightsState(mode) {
+                const extraClass = mode === 'green' ? ' green-on' : (mode === 'amber' ? ' amber-on' : '');
+                const fullClass = `light-bulb w-10 h-10 sm:w-14 sm:h-14 rounded-full border-2${extraClass}`;
+                for (let c = 0; c < 5; c++) {
+                    columns[c][0].className = fullClass;
+                    columns[c][1].className = fullClass;
+                }
+            }
+
+            // --- Loop Principale Continuo requestAnimationFrame ---
+            function mainLoop() {
+                const now = performance.now();
+                updateDisplayRefreshStats(now);
+
+                if (currentState === STATES.SEQUENCE) {
+                    const elapsed = now - sequenceStartTime;
+
+                    // 1. Accensione sequenziale delle 5 colonne (0..4)
+                    const targetLit = Math.min(5, Math.floor(elapsed / STEP_INTERVAL_MS) + 1);
+                    while (litColumnsCount < targetLit) {
+                        lightColumnRed(litColumnsCount);
+                        scheduleHardwareTone(440, 0.12, 'triangle', 0.14);
+                        litColumnsCount++;
+                    }
+
+                    // 2. Aggiorna il contatore visivo in millisecondi con 2 decimali (0.00 ms)
+                    if (now - lastClockUiRender >= 24) {
+                        sequenceElapsedEl.textContent = `${elapsed.toFixed(2)} ms`;
+                        lastClockUiRender = now;
+                    }
+
+                    // 3. Controllo istantaneo dello spegnimento "Lights Out"
+                    if (now >= lightsOutTargetTime) {
+                        setAllLightsState('off');
+                        const domMutatedAt = performance.now();
+                        currentState = STATES.LIGHTS_OUT;
+
+                        scheduleHardwareTone(880, 0.18, 'sine', 0.17);
+
+                        arenaContent.innerHTML = `
+                            <div class="px-6 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 mb-2">
+                                <h2 class="text-4xl sm:text-6xl font-black tracking-tight text-emerald-400 uppercase">
+                                    VIA! CLICCA ORA!
+                                </h2>
+                            </div>
+                            <p class="text-sm font-semibold text-emerald-200/80">Premi SPAZIO o tocca lo schermo all'istante!</p>
+                        `;
+
+                        if (useRealVSync) {
+                            lightsOutExactTime = domMutatedAt;
+                            requestAnimationFrame(() => {
+                                if (currentState === STATES.LIGHTS_OUT) {
+                                    lightsOutExactTime = performance.now();
+                                }
+                            });
+                        } else {
+                            lightsOutExactTime = domMutatedAt;
+                        }
+                    }
+                } else if (currentState === STATES.LIGHTS_OUT) {
+                    // Aggiorna il cronometro live in corsa al centesimo di millisecondo (0.00 ms)
+                    const liveReactionMs = Math.max(0, now - lightsOutExactTime);
+                    sequenceElapsedEl.textContent = `${liveReactionMs.toFixed(2)} ms`;
+                }
+
+                requestAnimationFrame(mainLoop);
+            }
+
+            // --- Persistenza Dati LocalStorage ---
+            function loadStats() {
+                const bestSingle = localStorage.getItem(STORAGE_KEY_BEST_SINGLE);
+                const bestAvg = localStorage.getItem(STORAGE_KEY_BEST_AVG);
+                let history = [];
+                try {
+                    history = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY)) || [];
+                } catch (e) {
+                    history = [];
+                }
+                return {
+                    bestSingle: bestSingle ? parseFloat(bestSingle) : null,
+                    bestAvg: bestAvg ? parseFloat(bestAvg) : null,
+                    history: Array.isArray(history) ? history : []
+                };
+            }
+
+            function saveSingleRecord(ms) {
+                const stats = loadStats();
+                let isNewRecord = false;
+                if (!stats.bestSingle || ms < stats.bestSingle) {
+                    localStorage.setItem(STORAGE_KEY_BEST_SINGLE, ms.toFixed(2));
+                    isNewRecord = true;
+                }
+                renderStorageUI();
+                return isNewRecord;
+            }
+
+            function saveAverageRecord(avgMs) {
+                const stats = loadStats();
+                let isNewAvgRecord = false;
+                if (!stats.bestAvg || avgMs < stats.bestAvg) {
+                    localStorage.setItem(STORAGE_KEY_BEST_AVG, avgMs.toFixed(2));
+                    isNewAvgRecord = true;
+                }
+                const updatedHistory = [Number(avgMs.toFixed(2)), ...stats.history].slice(0, 8);
+                localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(updatedHistory));
+                renderStorageUI();
+                return isNewAvgRecord;
+            }
+
+            // --- Valutazioni & Confronti ---
+            function getFeedbackForSingle(ms) {
+                if (ms < 160) return { label: 'Partenza fulminea! ⚡', desc: 'Riflessi sovrumani al limite della soglia umana.', tag: 'Fulmineo', tagClass: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+                if (ms < 195) return { label: 'Stacco da Pilota F1! 🏎️', desc: 'Tempi degni della prima fila in Formula 1.', tag: 'Pilota F1', tagClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+                if (ms < 230) return { label: 'Ottima reazione! 🔥', desc: 'Nettamente più veloce della media umana.', tag: 'Molto Veloce', tagClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30' };
+                if (ms < 270) return { label: 'Nella media 👍', desc: 'Buon tempo di risposta in griglia.', tag: 'Nella Media', tagClass: 'bg-slate-700/60 text-slate-300 border-slate-600' };
+                if (ms < 330) return { label: 'Un po\' in ritardo... ⏱️', desc: 'Hai perso qualche posizione alla prima curva.', tag: 'In Ritardo', tagClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+                return { label: 'Partenza al rallentatore 🐢', desc: 'Tieni il dito pronto appena si accende il 5° semaforo!', tag: 'Lento', tagClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30' };
+            }
+
+            function getComparisonData(avgMs) {
+                const minScale = 140;
+                const maxScale = 330;
+                const clamped = Math.max(minScale, Math.min(maxScale, avgMs));
+                const percent = ((clamped - minScale) / (maxScale - minScale)) * 100;
+
+                if (avgMs < 190) {
+                    return { rank: 'Pilota Formula 1', badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/30', markerPercent: percent };
+                } else if (avgMs <= 225) {
+                    return { rank: 'Molto Veloce', badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', markerPercent: percent };
+                } else if (avgMs <= 270) {
+                    return { rank: 'Media Umana', badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/30', markerPercent: percent };
+                } else {
+                    return { rank: 'Rilassato', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30', markerPercent: percent };
+                }
+            }
+
+            // --- Indicatori 5 Round (Stepper & Badge) ---
+            function renderRoundsStepper() {
+                if (isEndlessMode) {
+                    roundsStepper.classList.add('hidden');
+                    return;
+                }
+                roundsStepper.classList.remove('hidden');
+
+                const activeIndex = sessionTimes.length; // 0..4
+                let html = '';
+                for (let i = 0; i < STANDARD_ROUNDS; i++) {
+                    const hasScore = i < sessionTimes.length;
+                    const isCurrent = i === activeIndex && currentState !== STATES.SUMMARY;
+
+                    let cardClass = 'bg-slate-900/70 border-slate-800 text-slate-500';
+                    let valueText = 'In attesa';
+
+                    if (hasScore) {
+                        cardClass = 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300';
+                        valueText = `${sessionTimes[i].toFixed(2)} ms`;
+                    } else if (isCurrent) {
+                        cardClass = 'bg-red-500/15 border-red-500/50 text-white shadow-sm shadow-red-500/10';
+                        valueText = 'Attivo';
+                    }
+
+                    html += `
+                        <div class="rounded-xl border px-2 py-1.5 text-center transition-colors ${cardClass}">
+                            <span class="block text-[10px] font-extrabold uppercase tracking-wider opacity-80">Round ${i + 1}</span>
+                            <span class="block font-mono-telemetry text-[11px] sm:text-xs font-bold truncate">${valueText}</span>
+                        </div>
+                    `;
+                }
+                roundsStepper.innerHTML = html;
+            }
+
+            function updateRoundBadge() {
+                renderRoundsStepper();
+                if (currentState === STATES.SUMMARY) {
+                    roundBadge.textContent = 'Sessione 5/5 Completata';
+                    return;
+                }
+                const currentRoundNum = sessionTimes.length + (currentState === STATES.RESULT ? 0 : 1);
+                if (isEndlessMode) {
+                    roundBadge.textContent = `Round #${currentRoundNum} • Modalità Infinita`;
+                } else {
+                    roundBadge.textContent = `Round ${Math.min(currentRoundNum, STANDARD_ROUNDS)} / ${STANDARD_ROUNDS}`;
+                }
+            }
+
+            function renderSessionUI() {
+                if (sessionTimes.length === 0) {
+                    sessionAttemptsList.innerHTML = '<span class="text-xs text-slate-500 italic">Nessun round completato in questa sessione.</span>';
+                    liveAvgEl.textContent = '-- ms';
+                    liveBestEl.textContent = '-- ms';
+                    return;
+                }
+
+                sessionAttemptsList.innerHTML = sessionTimes.map((t, idx) => `
+                    <span class="font-mono-telemetry inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 text-slate-200 text-xs font-bold border border-slate-800">
+                        <span class="text-slate-500 font-normal">R${idx + 1}</span> ${t.toFixed(2)} ms
+                    </span>
+                `).join('');
+
+                const sum = sessionTimes.reduce((a, b) => a + b, 0);
+                const avg = sum / sessionTimes.length;
+                const best = Math.min(...sessionTimes);
+
+                liveAvgEl.textContent = `${avg.toFixed(2)} ms`;
+                liveBestEl.textContent = `${best.toFixed(2)} ms`;
+            }
+
+            function renderStorageUI() {
+                const stats = loadStats();
+                headerBestScore.textContent = stats.bestSingle ? `${stats.bestSingle.toFixed(2)} ms` : '-- ms';
+                storageBestSingleEl.textContent = stats.bestSingle ? `${stats.bestSingle.toFixed(2)} ms` : '-- ms';
+                storageBestAvgEl.textContent = stats.bestAvg ? `${stats.bestAvg.toFixed(2)} ms` : '-- ms';
+
+                if (stats.history.length === 0) {
+                    historyAveragesList.innerHTML = '<span class="text-xs text-slate-500 italic">Completa i 5 round per salvare la media.</span>';
+                } else {
+                    historyAveragesList.innerHTML = stats.history.map((avg, idx) => `
+                        <span class="font-mono-telemetry inline-flex items-center px-2.5 py-1 rounded-lg ${idx === 0 ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-slate-950 text-slate-400 border-slate-800'} text-xs font-bold border">
+                            ${Number(avg).toFixed(2)} ms
+                        </span>
+                    `).join('');
+                }
+            }
+
+            // --- Generazione Grafico SVG & Tabella Finale dei 5 Round ---
+            function renderSummaryChartAndTable(times, avg, best) {
+                // 1. Popolamento Tabella
+                resultsTableBody.innerHTML = times.map((time, idx) => {
+                    const isBest = time === best;
+                    const diff = time - avg;
+                    const diffFormatted = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)} ms`;
+                    const diffColor = diff <= 0 ? 'text-emerald-400' : 'text-rose-400';
+                    const feedback = getFeedbackForSingle(time);
+
+                    return `
+                        <tr class="${isBest ? 'bg-emerald-500/10' : 'hover:bg-slate-900/50'} transition-colors">
+                            <td class="py-3 px-4 font-bold text-slate-200">
+                                Round ${idx + 1}
+                                ${isBest ? '<span class="ml-1.5 inline-block px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Migliore</span>' : ''}
+                            </td>
+                            <td class="py-3 px-4 font-mono-telemetry font-extrabold ${isBest ? 'text-emerald-400' : 'text-white'}">
+                                ${time.toFixed(2)} ms
+                            </td>
+                            <td class="py-3 px-4 font-mono-telemetry font-semibold ${diffColor}">
+                                ${diffFormatted}
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${feedback.tagClass}">
+                                    ${feedback.tag}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // 2. Generazione Grafico SVG Nitido (Barre + Linea di Tendenza + Linea Media)
+                const svgW = 640;
+                const svgH = 220;
+                const padL = 52;
+                const padR = 28;
+                const padT = 32;
+                const padB = 34;
+                const plotW = svgW - padL - padR;
+                const plotH = svgH - padT - padB;
+
+                const minVal = Math.min(...times, avg);
+                const maxVal = Math.max(...times, avg);
+                const yMin = Math.max(80, Math.floor((minVal - 25) / 10) * 10);
+                const yMax = Math.ceil((maxVal + 25) / 10) * 10;
+                const ySpan = Math.max(20, yMax - yMin);
+
+                const getY = (val) => padT + plotH - ((val - yMin) / ySpan) * plotH;
+                const colWidth = plotW / times.length;
+                const getX = (idx) => padL + colWidth * idx + colWidth / 2;
+
+                // Griglia orizzontale (4 tacche)
+                let gridLines = '';
+                for (let s = 0; s <= 3; s++) {
+                    const val = yMin + (ySpan * s) / 3;
+                    const y = getY(val);
+                    gridLines += `
+                        <line x1="${padL}" y1="${y.toFixed(1)}" x2="${svgW - padR}" y2="${y.toFixed(1)}" stroke="#1e293b" stroke-width="1" />
+                        <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" fill="#64748b" font-size="10" font-family="JetBrains Mono, monospace" text-anchor="end">${val.toFixed(0)}</text>
+                    `;
+                }
+
+                // Linea orizzontale della Media
+                const avgY = getY(avg);
+                const avgLine = `
+                    <line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${svgW - padR}" y2="${avgY.toFixed(1)}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="5 4" />
+                    <rect x="${svgW - padR - 86}" y="${(avgY - 16).toFixed(1)}" width="86" height="14" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="0.8" />
+                    <text x="${svgW - padR - 43}" y="${(avgY - 6).toFixed(1)}" fill="#38bdf8" font-size="9" font-weight="bold" font-family="JetBrains Mono, monospace" text-anchor="middle">Media ${avg.toFixed(2)}</text>
+                `;
+
+                // Barre, punti e polilinea
+                const points = times.map((t, idx) => ({ x: getX(idx), y: getY(t), val: t, isBest: t === best }));
+                const polylinePoints = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+                const barsSvg = points.map((p, idx) => {
+                    const barW = 34;
+                    const barX = p.x - barW / 2;
+                    const barH = Math.max(4, (padT + plotH) - p.y);
+                    const fill = p.isBest ? 'url(#barBestGrad)' : 'url(#barStdGrad)';
+                    const stroke = p.isBest ? '#10b981' : '#334155';
+                    return `
+                        <rect x="${barX.toFixed(1)}" y="${p.y.toFixed(1)}" width="${barW}" height="${barH.toFixed(1)}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1" />
+                        <text x="${p.x.toFixed(1)}" y="${svgH - 12}" fill="${p.isBest ? '#34d399' : '#94a3b8'}" font-size="11" font-weight="bold" font-family="Inter, sans-serif" text-anchor="middle">R${idx + 1}</text>
+                    `;
+                }).join('');
+
+                const nodesSvg = points.map((p, idx) => {
+                    const dotColor = p.isBest ? '#10b981' : '#f43f5e';
+                    const labelColor = p.isBest ? '#34d399' : '#f8fafc';
+                    return `
+                        <g class="cursor-pointer">
+                            <title>Round ${idx + 1}: ${p.val.toFixed(2)} ms</title>
+                            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="${dotColor}" stroke="#090d16" stroke-width="2" />
+                            <text x="${p.x.toFixed(1)}" y="${(p.y - 11).toFixed(1)}" fill="${labelColor}" font-size="11" font-weight="800" font-family="JetBrains Mono, monospace" text-anchor="middle">${p.val.toFixed(2)}</text>
+                        </g>
+                    `;
+                }).join('');
+
+                resultsChartContainer.innerHTML = `
+                    <svg viewBox="0 0 ${svgW} ${svgH}" class="w-full h-auto overflow-visible select-none" role="img" aria-label="Grafico dei 5 tempi di reazione">
+                        <defs>
+                            <linearGradient id="barStdGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.32" />
+                                <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.04" />
+                            </linearGradient>
+                            <linearGradient id="barBestGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.45" />
+                                <stop offset="100%" stop-color="#10b981" stop-opacity="0.08" />
+                            </linearGradient>
+                        </defs>
+                        ${gridLines}
+                        ${barsSvg}
+                        ${avgLine}
+                        <polyline fill="none" stroke="#fb7185" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${polylinePoints}" />
+                        ${nodesSvg}
+                    </svg>
+                `;
+            }
+
+            // --- Transizioni di Stato ---
+            function goToIdle() {
+                currentState = STATES.IDLE;
+                resetAllLights();
+                gantryWrapper.classList.remove('hidden');
+                summaryPanel.classList.add('hidden');
+                arenaContent.classList.remove('hidden');
+                arena.classList.add('cursor-pointer');
+                sequenceElapsedEl.textContent = '0.00 ms';
+                updateRoundBadge();
+
+                arenaContent.innerHTML = `
+                    <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white mb-2.5 uppercase">
+                        Clicca o premi SPAZIO per iniziare
+                    </h2>
+                    <p class="text-sm sm:text-base text-slate-400 max-w-md leading-relaxed">
+                        Si accenderanno <span class="text-red-400 font-bold">5 semafori rossi</span> in sequenza. Appena si spengono, premi <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs font-mono-telemetry text-slate-200">SPAZIO</kbd> / <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-xs font-mono-telemetry text-slate-200">INVIO</kbd> o tocca lo schermo.
+                    </p>
+                `;
+            }
+
+            function startF1Sequence(now) {
+                warmUpAudio();
+
+                sequenceStartTime = now;
+                litColumnsCount = 0;
+                lastClockUiRender = 0;
+
+                const randomHoldMs = 800 + Math.random() * 2600;
+                lightsOutTargetTime = sequenceStartTime + (4 * STEP_INTERVAL_MS) + randomHoldMs;
+
+                resetAllLights();
+                lightColumnRed(0);
+                scheduleHardwareTone(440, 0.12, 'triangle', 0.14);
+                litColumnsCount = 1;
+
+                currentState = STATES.SEQUENCE;
+                gantryWrapper.classList.remove('hidden');
+                summaryPanel.classList.add('hidden');
+                arenaContent.classList.remove('hidden');
+                arena.classList.add('cursor-pointer');
+                updateRoundBadge();
+
+                arenaContent.innerHTML = `
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-bold uppercase tracking-wider mb-3">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        Procedura di partenza attiva
+                    </div>
+                    <h2 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-white mb-1.5 uppercase">
+                        Attendi lo spegnimento...
+                    </h2>
+                    <p class="text-sm text-slate-400">Non muoverti finché le luci rosse non si spengono!</p>
+                `;
+            }
+
+            function triggerFalseStart(now, sub100ReactionMs = null) {
+                currentState = STATES.FALSE_START;
+                setAllLightsState('amber');
+                scheduleHardwareTone(150, 0.25, 'sawtooth', 0.16);
+
+                let detailHtml = '';
+                if (sub100ReactionMs !== null) {
+                    sequenceElapsedEl.textContent = `${sub100ReactionMs.toFixed(2)} ms`;
+                    detailHtml = `Reazione registrata: <span class="font-mono-telemetry font-bold text-white">${sub100ReactionMs.toFixed(2)} ms</span> — sotto la soglia minima umana di <span class="font-mono-telemetry font-bold text-amber-300">100.00 ms</span> (hai tirato a indovinare!).`;
+                } else {
+                    const elapsedMs = (now - sequenceStartTime).toFixed(2);
+                    sequenceElapsedEl.textContent = `${elapsedMs} ms`;
+                    detailHtml = `Hai cliccato prima dello spegnimento dei 5 semafori rossi (<span class="font-mono-telemetry font-bold text-white">${elapsedMs} ms</span> dall'avvio).`;
+                }
+
+                arenaContent.innerHTML = `
+                    <div class="animate-pop flex flex-col items-center">
+                        <span class="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider mb-2.5">
+                            ⚠️ Penalità Falso Start • Round non valido
+                        </span>
+                        <h2 class="text-3xl sm:text-5xl font-black tracking-tight text-amber-400 mb-2 uppercase">
+                            Sei andato d'anticipo!
+                        </h2>
+                        <p class="text-sm sm:text-base text-slate-300 max-w-md mb-5">
+                            ${detailHtml}
+                        </p>
+                        <span class="px-5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-bold text-white">
+                            Clicca o premi SPAZIO per ripetere il Round
+                        </span>
+                    </div>
+                `;
+            }
+
+            function recordValidReaction(now) {
+                const rawDeltaMs = Math.max(0, now - lightsOutExactTime);
+                const reactionMs = Number(rawDeltaMs.toFixed(2));
+
+                // Controllo soglia minima umana < 100.00 ms
+                if (reactionMs < MIN_VALID_REACTION_MS) {
+                    triggerFalseStart(now, reactionMs);
+                    return;
+                }
+
+                currentState = STATES.RESULT;
+                sequenceElapsedEl.textContent = `${reactionMs.toFixed(2)} ms`;
+                setAllLightsState('green');
+
+                sessionTimes.push(reactionMs);
+                const isNewSingleRecord = saveSingleRecord(reactionMs);
+                renderSessionUI();
+
+                if (!isEndlessMode && sessionTimes.length >= STANDARD_ROUNDS) {
+                    updateRoundBadge();
+                    showFinalSummary();
+                    return;
+                }
+
+                updateRoundBadge();
+                const feedback = getFeedbackForSingle(reactionMs);
+
+                arenaContent.innerHTML = `
+                    <div class="animate-pop flex flex-col items-center">
+                        ${isNewSingleRecord ? '<span class="mb-2 px-3.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black uppercase tracking-wider">🏆 Nuovo Record Personale!</span>' : ''}
+                        <div class="font-mono-telemetry text-5xl sm:text-7xl font-black tracking-tight text-white mb-1.5">
+                            ${reactionMs.toFixed(2)} <span class="text-2xl sm:text-3xl font-bold text-emerald-400">ms</span>
+                        </div>
+                        <h3 class="text-lg sm:text-xl font-extrabold text-slate-100 mb-1">${feedback.label}</h3>
+                        <p class="text-xs sm:text-sm text-slate-400 mb-1">${feedback.desc}</p>
+                        <p class="font-mono-telemetry text-[11px] text-slate-500 mb-5">
+                            Monitor: ${measuredHz} Hz (${measuredFrameMs.toFixed(2)} ms/frame) • Sync ${useRealVSync ? 'VSync Reale' : 'DOM Immediato'}
+                        </p>
+                        <span class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm font-bold text-white">
+                            Clicca o premi SPAZIO per il Round ${sessionTimes.length + 1}
+                        </span>
+                    </div>
+                `;
+            }
+
+            function showFinalSummary() {
+                currentState = STATES.SUMMARY;
+                updateRoundBadge();
+                arena.classList.remove('cursor-pointer');
+                gantryWrapper.classList.add('hidden');
+                arenaContent.classList.add('hidden');
+                summaryPanel.classList.remove('hidden');
+
+                const count = sessionTimes.length;
+                const sum = sessionTimes.reduce((a, b) => a + b, 0);
+                const avg = sum / count;
+                const best = Math.min(...sessionTimes);
+
+                const variance = sessionTimes.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / count;
+                const stdDev = Math.sqrt(variance);
+
+                const isNewAvgRecord = saveAverageRecord(avg);
+                const comparison = getComparisonData(avg);
+
+                summaryAvg.textContent = avg.toFixed(2);
+                summaryBest.textContent = best.toFixed(2);
+                summaryStdDev.textContent = stdDev.toFixed(2);
+
+                renderSummaryChartAndTable(sessionTimes, avg, best);
+
+                summaryRankBadge.textContent = comparison.rank;
+                summaryRankBadge.className = `text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${comparison.badgeClass}`;
+                scaleMarker.style.left = `${comparison.markerPercent}%`;
+
+                summaryRecordNote.innerHTML = isNewAvgRecord
+                    ? '<span class="text-emerald-400 font-bold">🎉 Nuovo record assoluto di media registrato in telemetria!</span>'
+                    : `Riferimento piloti Formula 1 reali: <strong class="text-slate-200">180.00 – 205.00 ms</strong> • Monitor rilevato: <strong class="text-sky-400">${measuredHz} Hz</strong>`;
+            }
+
+            // --- Gestione Input a Latenza Zero (Capture Phase + Passive) ---
+            function processZeroLatencyTrigger() {
+                const now = performance.now();
+
+                switch (currentState) {
+                    case STATES.LIGHTS_OUT:
+                        recordValidReaction(now);
+                        break;
+                    case STATES.SEQUENCE:
+                        triggerFalseStart(now, null);
+                        break;
+                    case STATES.IDLE:
+                    case STATES.FALSE_START:
+                    case STATES.RESULT:
+                        startF1Sequence(now);
+                        break;
+                    case STATES.SUMMARY:
+                        break;
+                }
+            }
+
+            arena.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                if (currentState === STATES.SUMMARY) return;
+                processZeroLatencyTrigger();
+            }, { capture: true, passive: true });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.repeat) return;
+                if (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowUp') {
+                    const tag = document.activeElement ? document.activeElement.tagName : '';
+                    if (tag === 'BUTTON' && currentState !== STATES.SEQUENCE && currentState !== STATES.LIGHTS_OUT) {
+                        return;
+                    }
+
+                    if (currentState === STATES.SUMMARY) {
+                        sessionTimes = [];
+                        renderSessionUI();
+                        startF1Sequence(performance.now());
+                    } else {
+                        processZeroLatencyTrigger();
+                    }
+                }
+            }, { capture: true, passive: true });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' || e.code === 'ArrowUp') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // --- Controlli Pulsanti UI ---
+            btnSyncToggle.addEventListener('click', () => {
+                useRealVSync = !useRealVSync;
+                syncModeLabel.textContent = useRealVSync ? 'VSync' : 'DOM';
+                syncModeLabel.className = useRealVSync ? 'text-sky-400' : 'text-amber-400';
+            });
+
+            btnAudioToggle.addEventListener('click', () => {
+                audioEnabled = !audioEnabled;
+                if (audioEnabled) {
+                    iconAudioOn.classList.remove('hidden');
+                    iconAudioOff.classList.add('hidden');
+                    scheduleHardwareTone(523.25, 0.1, 'sine', 0.12);
+                } else {
+                    iconAudioOn.classList.add('hidden');
+                    iconAudioOff.classList.remove('hidden');
+                }
+            });
+
+            btnRestart.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sessionTimes = [];
+                renderSessionUI();
+                startF1Sequence(performance.now());
+            });
+
+            btnContinueEndless.addEventListener('click', (e) => {
+                e.stopPropagation();
+                isEndlessMode = true;
+                modeLabel.textContent = 'Infinita';
+                startF1Sequence(performance.now());
+            });
+
+            btnModeToggle.addEventListener('click', () => {
+                isEndlessMode = !isEndlessMode;
+                modeLabel.textContent = isEndlessMode ? 'Infinita' : '5 Giri';
+                sessionTimes = [];
+                renderSessionUI();
+                goToIdle();
+            });
+
+            btnResetSession.addEventListener('click', () => {
+                sessionTimes = [];
+                renderSessionUI();
+                goToIdle();
+            });
+
+            btnClearStorage.addEventListener('click', () => {
+                localStorage.removeItem(STORAGE_KEY_BEST_SINGLE);
+                localStorage.removeItem(STORAGE_KEY_BEST_AVG);
+                localStorage.removeItem(STORAGE_KEY_HISTORY);
+                renderStorageUI();
+            });
+
+            // Avvio del loop continuo requestAnimationFrame e inizializzazione UI
+            renderStorageUI();
+            renderSessionUI();
+            goToIdle();
+            requestAnimationFrame(mainLoop);
+        });
+    </script>
+</body>
+</html>
